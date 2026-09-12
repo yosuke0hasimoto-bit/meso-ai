@@ -116,7 +116,7 @@ async function handleMessage(lineUserId: string, text: string, replyToken: strin
 
   await replyMessage(
     replyToken,
-    `${draft.name}のプロフィール登録が完了しました！これから一緒にしつけを頑張りましょう。何か気になることがあれば、いつでも話しかけてください。`
+    `${draft.name}ちゃんのプロフィール登録が完了しました！これから一緒にしつけを頑張りましょう。何か気になることがあれば、いつでも話しかけてください。`
   );
 }
 
@@ -163,9 +163,14 @@ async function askAI(dog: any, userMessage: string): Promise<string> {
     return `すみません、AIとの通信でエラーが発生しました。(${errorText.slice(0, 100)})`;
   }
 
-  const json = await res.json();
-  return json.content?.[0]?.text ?? '回答を生成できませんでした。';
-}
+   const json = await res.json();
+  const text = json.content?.[0]?.text;
+
+  if (!text) {
+    return `回答を生成できませんでした。[DEBUG] stop_reason=${json.stop_reason} / content=${JSON.stringify(json.content)}`;
+  }
+
+  return text;
 
 async function ensureUser(lineUserId: string) {
   const { data: existing } = await supabase
