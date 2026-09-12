@@ -7,9 +7,9 @@ export const runtime = 'nodejs';
 const QUESTIONS = [
   { field: 'name', prompt: '愛犬の名前を教えてください。' },
   { field: 'breed', prompt: '犬種を教えてください。' },
-  { field: 'age_years', prompt: '年齢を教えてください（数字だけでOKです。例: 3）' },
-  { field: 'gender', prompt: '性別を教えてください（オス/メス）' },
-  { field: 'weight_kg', prompt: '体重を教えてください（kgで、例: 5.5）' },
+  { field: 'age_years', prompt: '年齢を教えてください(数字だけでOKです。例: 3)' },
+  { field: 'gender', prompt: '性別を教えてください(オス/メス)' },
+  { field: 'weight_kg', prompt: '体重を教えてください(kgで、例: 5.5)' },
   { field: 'personality', prompt: '性格を教えてください。' },
   { field: 'likes', prompt: '好きなものを教えてください。' },
   { field: 'dislikes', prompt: '苦手なものを教えてください。' },
@@ -49,12 +49,22 @@ async function handleMessage(lineUserId: string, text: string, replyToken: strin
 
   const { data: existingDog } = await supabase
     .from('dogs')
-    .select('id')
+    .select('*')
     .eq('user_id', user.id)
     .maybeSingle();
 
   if (existingDog) {
-    await replyMessage(replyToken, 'プロフィール登録は完了しています。ご相談をどうぞ！');
+    const aiReply = await askAI(existingDog, text);
+    await replyMessage(replyToken, aiReply);
+
+    await supabase.from('consultations').insert({
+      user_id: user.id,
+      dog_id: existingDog.id,
+      user_message: text,
+      ai_response: aiReply,
+      category: 'other',
+      risk_level: 'low',
+    });
     return;
   }
 
@@ -106,8 +116,55 @@ async function handleMessage(lineUserId: string, text: string, replyToken: strin
 
   await replyMessage(
     replyToken,
-    `${draft.name}のプロフィール登録が完了しました！これから一緒にしつけを頑張りましょう。`
+    `${draft.name}のプロフィール登録が完了しました！これから一緒にしつけを頑張りましょう。何か気になることがあれば、いつでも話しかけてください。`
   );
+}
+
+async function askAI(dog: any, userMessage: string): Promise<string> {
+  const systemPrompt = `あなたは犬のしつけ相談AI「Meso AI」です。以下の犬のプロフィールを踏まえて、飼い主からの相談に日本語で答えてください。
+
+【犬のプロフィール】
+名前: ${dog.name}
+犬種: ${dog.breed ?? '不明'}
+年齢: ${dog.age_years ?? '不明'}歳
+性別: ${dog.gender ?? '不明'}
+体重: ${dog.weight_kg ?? '不明'}kg
+性格: ${dog.personality ?? '不明'}
+好きなもの: ${dog.likes ?? '不明'}
+苦手なもの: ${dog.dislikes ?? '不明'}
+現在困っている行動: ${dog.current_issue ?? '特になし'}
+
+回答は必ず次の構成にしてください。
+1. 状況の整理
+2. 考えられる理由
+3. 今は避けた方がいい対応
+4. 今日からできること
+5. 必要であれば追加の質問
+
+断定的な診断はせず、重大な健康問題や危険性の高い攻撃行動が疑われる場合は、必ず獣医師や専門のドッグトレーナーへの相談を勧めてください。`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY!,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-5',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    return `すみません、AIとの通信でエラーが発生しました。(${errorText.slice(0, 100)})`;
+  }
+
+  const json = await res.json();
+  return json.content?.[0]?.text ?? '回答を生成できませんでした。';
 }
 
 async function ensureUser(lineUserId: string) {
@@ -143,3 +200,4 @@ async function replyMessage(replyToken: string, text: string) {
     }),
   });
 }
+
