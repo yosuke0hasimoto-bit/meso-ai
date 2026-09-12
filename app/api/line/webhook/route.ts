@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
   for (const event of events) {
     if (event.type === 'message' && event.message.type === 'text') {
       const lineUserId = event.source.userId;
-      const debugInfo = await ensureUser(lineUserId);
-      await replyMessage(event.replyToken, `オウム返し: ${event.message.text}\n[DEBUG] ${debugInfo}`);
+            await ensureUser(lineUserId);
+      await replyMessage(event.replyToken, `オウム返し: ${event.message.text}`);
     }
   }
 
