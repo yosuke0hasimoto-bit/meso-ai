@@ -68,6 +68,3 @@ async function replyMessage(replyToken: string, text: string) {
     }),
   });
 }
-git add .
-git commit -m "デバッグ情報を返信メッセージに含める"
-git push
