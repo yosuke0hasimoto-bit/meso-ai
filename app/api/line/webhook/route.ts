@@ -152,7 +152,7 @@ async function askAI(dog: any, userMessage: string): Promise<string> {
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 1024,
+      max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     }),
@@ -163,8 +163,9 @@ async function askAI(dog: any, userMessage: string): Promise<string> {
     return `すみません、AIとの通信でエラーが発生しました。(${errorText.slice(0, 100)})`;
   }
 
-   const json = await res.json();
-  const text = json.content?.[0]?.text;
+  const json = await res.json();
+  const textBlock = json.content?.find((block: any) => block.type === 'text');
+  const text = textBlock?.text;
 
   if (!text) {
     return `回答を生成できませんでした。[DEBUG] stop_reason=${json.stop_reason} / content=${JSON.stringify(json.content)}`;
@@ -172,6 +173,7 @@ async function askAI(dog: any, userMessage: string): Promise<string> {
 
   return text;
 }
+
 async function ensureUser(lineUserId: string) {
   const { data: existing } = await supabase
     .from('users')
@@ -205,4 +207,3 @@ async function replyMessage(replyToken: string, text: string) {
     }),
   });
 }
-
