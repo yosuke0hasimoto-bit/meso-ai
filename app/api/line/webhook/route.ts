@@ -171,7 +171,7 @@ async function askAI(dog: any, userMessage: string): Promise<string> {
   }
 
   return text;
-
+}
 async function ensureUser(lineUserId: string) {
   const { data: existing } = await supabase
     .from('users')
