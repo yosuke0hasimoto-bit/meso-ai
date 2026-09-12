@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { supabase } from '@/lib/supabase/client';
 
 export const runtime = 'nodejs';
 
@@ -10,7 +11,6 @@ export async function POST(request: NextRequest) {
   const channelSecret = process.env.LINE_CHANNEL_SECRET!;
   const hash = crypto.createHmac('sha256', channelSecret).update(body).digest('base64');
 
-  // LINEからの正規のリクエストか確認する
   if (hash !== signature) {
     return NextResponse.json({ error: 'invalid signature' }, { status: 401 });
   }
@@ -20,11 +20,39 @@ export async function POST(request: NextRequest) {
 
   for (const event of events) {
     if (event.type === 'message' && event.message.type === 'text') {
-      await replyMessage(event.replyToken, event.message.text);
+      const lineUserId = event.source.userId;
+      const debugInfo = await ensureUser(lineUserId);
+      await replyMessage(event.replyToken, `オウム返し: ${event.message.text}\n[DEBUG] ${debugInfo}`);
     }
   }
 
   return NextResponse.json({ status: 'ok' });
+}
+
+async function ensureUser(lineUserId: string): Promise<string> {
+  const { data: existing, error: selectError } = await supabase
+    .from('users')
+    .select('id')
+    .eq('line_user_id', lineUserId)
+    .maybeSingle();
+
+  if (selectError) {
+    return `検索エラー: ${selectError.message}`;
+  }
+
+  if (existing) {
+    return '既存ユーザーでした';
+  }
+
+  const { error: insertError } = await supabase
+    .from('users')
+    .insert({ line_user_id: lineUserId });
+
+  if (insertError) {
+    return `登録エラー: ${insertError.message}`;
+  }
+
+  return '新規登録に成功しました';
 }
 
 async function replyMessage(replyToken: string, text: string) {
@@ -36,7 +64,10 @@ async function replyMessage(replyToken: string, text: string) {
     },
     body: JSON.stringify({
       replyToken,
-      messages: [{ type: 'text', text: `オウム返し: ${text}` }],
+      messages: [{ type: 'text', text }],
     }),
   });
 }
+git add .
+git commit -m "デバッグ情報を返信メッセージに含める"
+git push
